@@ -953,7 +953,9 @@ static int createMaps(const char* elfPath, ifstream& elfFile, vector<unique_fd>&
         if (specified(pin_subdir)) {
             ALOGV("map %s pin_subdir [%-32s] -> %d -> '%s'", mapNames[i].c_str(), md[i].pin_subdir,
                   static_cast<int>(pin_subdir), lookupPinSubdir(pin_subdir));
-            abort();
+            //abort();
+            mapFds.push_back(unique_fd());
+            continue;
         }
 
         // Format of pin location is /sys/fs/bpf/<pin_subdir|prefix>map_<objName>_<mapName>
@@ -970,7 +972,9 @@ static int createMaps(const char* elfPath, ifstream& elfFile, vector<unique_fd>&
             saved_errno = errno;
             ALOGD("bpf_create_map reusing map %s, ret: %d", mapNames[i].c_str(), fd.get());
             reuse = true;
-            abort();
+            //abort();
+            mapFds.push_back(unique_fd());
+            continue;
         } else {
             union bpf_attr req = {
               .map_type = type,
@@ -1170,7 +1174,7 @@ static int loadCodeSections(const char* elfPath, vector<codeSection>& cs, const 
             ALOGV("prog %s pin_subdir [%-32s] -> %d -> '%s'", name.c_str(),
                   cs[i].prog_def->pin_subdir, static_cast<int>(pin_subdir),
                   lookupPinSubdir(pin_subdir));
-            abort();
+           // abort();
         }
 
         // strip any potential $foo suffix
@@ -1362,7 +1366,10 @@ int loadProg(const char* const elfPath, const unsigned int bpfloader_ver,
         ALOGV("map_fd found at %d is %d in %s", i, mapFds[i].get(), elfPath);
 
     ret = readCodeSections(elfFile, cs);
-    if (ret == -ENOENT) return 0;
+    // BPF .o's with no programs are only supported by mainline netbpfload,
+    // make sure .o's targeting non-mainline (ie. S) bpfloader don't show up.
+    if (ret == -ENOENT && bpfLoaderMinVer >= BPFLOADER_MAINLINE_S_VERSION)
+        return 0;
     if (ret) {
         ALOGE("Couldn't read all code sections in %s", elfPath);
         return ret;
@@ -1402,20 +1409,20 @@ static int loadObject(const unsigned int bpfloader_ver, const char* const prefix
 static int loadAllObjects(const unsigned int bpfloader_ver) {
     // S+ Tethering mainline module (network_stack): tether offload
     // loads under /sys/fs/bpf/tethering:
-    if (loadObject(bpfloader_ver, "tethering/", "offload.o")) return 1;
-    if (loadObject(bpfloader_ver, "tethering/", "test.o")) return 1;
+    if (loadObject(bpfloader_ver, "tethering/", "offload.o")) { /*return 1;*/ }
+    if (loadObject(bpfloader_ver, "tethering/", "test.o")) { /*return 1;*/ }
     if (isAtLeastT) {
         // T+ Tethering mainline module loads under:
         // /sys/fs/bpf/net_shared: shared with netd & system server
-        if (loadObject(bpfloader_ver, "net_shared/", "clatd.o")) return 1;
-        if (loadObject(bpfloader_ver, "net_shared/", "dscpPolicy.o")) return 1;
+        if (loadObject(bpfloader_ver, "net_shared/", "clatd.o")) { /*return 1;*/ }
+        if (loadObject(bpfloader_ver, "net_shared/", "dscpPolicy.o")) { /*return 1;*/ }
 
         // /sys/fs/bpf/netd_shared: shared with netd & system server
         // - netutils_wrapper (for iptables xt_bpf) has access to programs
 
         // WARNING: Android T+ non-updatable netd depends on both of the
         // 'netd_shared' & 'netd' strings for xt_bpf programs it loads
-        if (loadObject(bpfloader_ver, "netd_shared/", "netd.o")) return 1;
+        if (loadObject(bpfloader_ver, "netd_shared/", "netd.o")) { /*return 1;*/ }
 
         // /sys/fs/bpf/netd_readonly: shared with netd & system server
         // - netutils_wrapper has no access, netd has read only access
@@ -1836,13 +1843,13 @@ static int doLoad(char** argv, char * const envp[]) {
         uint32_t progId = bpfGetNextProgId(0);  // expect 0 with errno == ENOENT
         if (progId || errno != ENOENT) {
             ALOGE("bpfGetNextProgId(zero) returned %u (errno %d)", progId, errno);
-            return 1;
+            //return 1;
         }
         errno = 0;
         uint32_t mapId = bpfGetNextMapId(0);  // expect 0 with errno == ENOENT
         if (mapId || errno != ENOENT) {
             ALOGE("bpfGetNextMapId(zero) returned %u (errno %d)", mapId, errno);
-            return 1;
+            //return 1;
         }
     } else if (isAtLeastKernelVersion(4, 14, 0)) {  // implies S through U QPR2
         // bpfGetNext{Prog,Map}Id require 4.14+
@@ -1855,7 +1862,7 @@ static int doLoad(char** argv, char * const envp[]) {
             if (!next && errno == ENOENT) break;
             if (next <= mapId) {
                 ALOGE("bpfGetNextMapId(%u) returned %u errno %d", mapId, next, errno);
-                return 1;
+                //return 1;
             }
             mapId = next;
         }
@@ -1868,7 +1875,7 @@ static int doLoad(char** argv, char * const envp[]) {
             // which causes bpfGetNextMapId to behave as bpfGetNextProgId,
             // and thus it should return 0 with errno == ENOENT.
             ALOGE("bpfGetNextMapId(final %d) returned %d errno %d", mapId, next, errno);
-            return 1;
+            //return 1;
         }
     } else {  // implies S/T with 4.9 kernel
         // nothing we can do.
@@ -1878,17 +1885,17 @@ static int doLoad(char** argv, char * const envp[]) {
     // (this must be done first to allow selinux_context and pin_subdir functionality,
     //  which could otherwise fail with ENOENT during object pinning or renaming,
     //  due to ordering issues)
-    if (createDir("/sys/fs/bpf/tethering")) return 1;
+    if (createDir("/sys/fs/bpf/tethering")) { /* return 1;*/ }
     // This is technically T+ but S also needs it for the 'mainline_done' file.
-    if (createDir("/sys/fs/bpf/netd_shared")) return 1;
+    if (createDir("/sys/fs/bpf/netd_shared")) { /* return 1;*/ }
 
     if (isAtLeastT) {
-        if (createDir("/sys/fs/bpf/netd_readonly")) return 1;
-        if (createDir("/sys/fs/bpf/net_shared")) return 1;
-        if (createDir("/sys/fs/bpf/net_private")) return 1;
+        if (createDir("/sys/fs/bpf/netd_readonly")) { /* return 1;*/ }
+        if (createDir("/sys/fs/bpf/net_shared")) { /* return 1;*/ }
+        if (createDir("/sys/fs/bpf/net_private")) { /* return 1;*/ }
 
         // This one is primarily meant for triggering genfscon rules.
-        if (createDir("/sys/fs/bpf/loader")) return 1;
+        if (createDir("/sys/fs/bpf/loader")) { /* return 1;*/ }
     }
 
     // Load all ELF objects, create programs and maps, and pin them
