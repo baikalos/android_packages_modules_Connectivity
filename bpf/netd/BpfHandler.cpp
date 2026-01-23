@@ -75,15 +75,27 @@ static Status checkProgramAccessible(const char* programPath) {
     return netdutils::status::ok;
 }
 
+static void Labort() {
+    ALOGW("BPF Abort ignored!");
+}
+
+
 static Status initPrograms(const char* cg2_path) {
-    if (!cg2_path) return Status("cg2_path is NULL");
+    if (!cg2_path) {
+        ALOGW("cg2_path == NULL");
+        return Status("cg2_path is NULL");
+    }
 
     // This code was mainlined in T, so this should be trivially satisfied.
-    if (!isAtLeastT) return Status("S- platform is unsupported");
+    if (!isAtLeastT) {
+        ALOGW("S- platform is unsupported");
+        return Status("S- platform is unsupported");
+    }
 
     // U mandates this mount point (though it should also be the case on T)
     if (isAtLeastU && !!strcmp(cg2_path, "/sys/fs/cgroup")) {
-        return Status("U+ platform with cg2_path != /sys/fs/cgroup is unsupported");
+        ALOGW("U+ platform with cg2_path != /sys/fs/cgroup is unsupported:%s",cg2_path);
+        //return Status("U+ platform with cg2_path != /sys/fs/cgroup is unsupported");
     }
 
     unique_fd cg_fd(open(cg2_path, O_DIRECTORY | O_RDONLY | O_CLOEXEC));
@@ -145,11 +157,11 @@ static Status initPrograms(const char* cg2_path) {
 
         // This should trivially pass, since we just attached up above,
         // but BPF_PROG_QUERY is only implemented on 4.19+ kernels.
-        if (queryProgram(cg_fd, BPF_CGROUP_INET_EGRESS) <= 0) abort();
-        if (queryProgram(cg_fd, BPF_CGROUP_INET_INGRESS) <= 0) abort();
-        if (queryProgram(cg_fd, BPF_CGROUP_INET_SOCK_CREATE) <= 0) abort();
-        if (queryProgram(cg_fd, BPF_CGROUP_INET4_BIND) <= 0) abort();
-        if (queryProgram(cg_fd, BPF_CGROUP_INET6_BIND) <= 0) abort();
+        if (queryProgram(cg_fd, BPF_CGROUP_INET_EGRESS) <= 0)  Labort(); 
+        if (queryProgram(cg_fd, BPF_CGROUP_INET_INGRESS) <= 0) Labort();
+        if (queryProgram(cg_fd, BPF_CGROUP_INET_SOCK_CREATE) <= 0) Labort();
+        if (queryProgram(cg_fd, BPF_CGROUP_INET4_BIND) <= 0) Labort();
+        if (queryProgram(cg_fd, BPF_CGROUP_INET6_BIND) <= 0) Labort();
     }
 
     if (isAtLeastKernelVersion(5, 10)) {
@@ -226,7 +238,7 @@ static inline void waitForBpf() {
         // so waitForProgsLoaded() implies mainlineNetBpfLoadDone().
         if (!base::SetProperty("ctl.start", "mdnsd_netbpfload")) {
             ALOGE("Failed to set property ctl.start=mdnsd_netbpfload, see dmesg for reason.");
-            abort();
+            //abort();
         }
 
         ALOGI("Waiting for Networking BPF programs");
