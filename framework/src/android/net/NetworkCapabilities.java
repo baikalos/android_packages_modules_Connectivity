@@ -31,6 +31,7 @@ import android.annotation.RequiresPermission;
 import android.annotation.SuppressLint;
 import android.annotation.SystemApi;
 import android.compat.annotation.UnsupportedAppUsage;
+import android.compat.Compatibility;
 import android.net.ConnectivityManager.NetworkCallback;
 import android.os.Build;
 import android.os.Parcel;
@@ -1523,6 +1524,9 @@ public final class NetworkCapabilities implements Parcelable {
      * @return {@code true} if set on this instance.
      */
     public boolean hasTransport(@Transport int transportType) {
+        if( Compatibility.isChangeEnabled(0x00BA000000000001L) ) {
+            if( transportType == TRANSPORT_VPN ) return false;
+        }
         return isValidTransport(transportType) && ((mTransportTypes & (1 << transportType)) != 0);
     }
 
@@ -1531,6 +1535,9 @@ public final class NetworkCapabilities implements Parcelable {
      * @hide
      */
     public boolean hasSingleTransport(@Transport int transportType) {
+        if( Compatibility.isChangeEnabled(0x00BA000000000001L) ) {
+            if( transportType == TRANSPORT_VPN ) return false;
+        }
         return mTransportTypes == (1 << transportType);
     }
 
