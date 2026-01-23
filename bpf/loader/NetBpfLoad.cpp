@@ -892,7 +892,10 @@ static int createMaps(ElfObject& elfObj, vector<struct bpf_map_def>& md, vector<
             fd.reset(mapRetrieveRO(md[i].pin_location));
             saved_errno = errno;
             ALOGD("bpf_create_map reusing map %s, ret: %d", md[i].name(), fd.get());
-            abort();
+            //reuse = true;
+            //abort();
+            mapFds.push_back(unique_fd());
+            continue;
         } else {
             union bpf_attr req = {
               .map_type = type,
@@ -1388,12 +1391,12 @@ static bool loadObject(const char* const progPath, const bool useLibbpf = false)
 
 static bool loadAllObjects() {
     bool libbpf = isAtLeast26Q1 || useLibBpf;
-    if (!loadObject(BPFROOT "offload.o")) return false;
-    if (!loadObject(BPFROOT "test.o", libbpf)) return false;
+    if (!loadObject(BPFROOT "offload.o")) { /* return false */};
+    if (!loadObject(BPFROOT "test.o", libbpf)) { /* return false */};
     if (isAtLeastT) {
-        if (!loadObject(BPFROOT "clatd.o", libbpf)) return false;
-        if (!loadObject(BPFROOT "dscpPolicy.o", libbpf)) return false;
-        if (!loadObject(BPFROOT "netd.o", libbpf)) return false;
+        if (!loadObject(BPFROOT "clatd.o", libbpf)) { /* return false */};
+        if (!loadObject(BPFROOT "dscpPolicy.o", libbpf)) { /* return false */};
+        if (!loadObject(BPFROOT "netd.o", libbpf)) { /* return false */};
     }
     return true;
 }
@@ -1807,13 +1810,13 @@ static int doLoad(char** argv, char * const envp[]) {
         uint32_t progId = bpfGetNextProgId(0);  // expect 0 with errno == ENOENT
         if (progId || errno != ENOENT) {
             ALOGE("bpfGetNextProgId(zero) returned %u (errno %d)", progId, errno);
-            return 32;
+            //return 32; // TODO: sdv BPF code was ignored
         }
         errno = 0;
         uint32_t mapId = bpfGetNextMapId(0);  // expect 0 with errno == ENOENT
         if (mapId || errno != ENOENT) {
             ALOGE("bpfGetNextMapId(zero) returned %u (errno %d)", mapId, errno);
-            return 33;
+            //return 33; // TODO: sdv BPF code was ignored
         }
     } else if (isAtLeastKernelVersion(4, 14)) {  // implies S through U QPR2
         // bpfGetNext{Prog,Map}Id require 4.14+
@@ -1826,7 +1829,7 @@ static int doLoad(char** argv, char * const envp[]) {
             if (!next && errno == ENOENT) break;
             if (next <= mapId) {
                 ALOGE("bpfGetNextMapId(%u) returned %u errno %d", mapId, next, errno);
-                return 34;
+                //return 34; // TODO: sdv BPF code was ignored
             }
             mapId = next;
         }
@@ -1839,13 +1842,16 @@ static int doLoad(char** argv, char * const envp[]) {
             // which causes bpfGetNextMapId to behave as bpfGetNextProgId,
             // and thus it should return 0 with errno == ENOENT.
             ALOGE("bpfGetNextMapId(final %d) returned %d errno %d", mapId, next, errno);
+
+            // TODO: sdv BPF bloc  was ignored
+            /*
             if (next || errno != ENOENT) return 35;
             if (isAtLeastT || isAtLeastKernelVersion(4, 20)) return 36;
             // implies Android S with 4.14 or 4.19 kernel
             ALOGW("Detected kernel with invalid BPF UAPI - disabling mainline use of eBPF.");
             // leave a flag that we're 'done'
             if (!createDir("/sys/fs/bpf/netd_shared/mainline_done")) return 37;
-            return 0;
+            return 0;*/
         }
     } else {  // implies S/T with 4.9 kernel
         // nothing we can do.

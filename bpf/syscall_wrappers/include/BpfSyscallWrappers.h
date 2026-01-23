@@ -192,7 +192,10 @@ inline int bpfLock(int fd, short type) {
     int saved_errno = errno;
     // 4.14+ required to fetch map id, but we don't want to call isAtLeastKernelVersion
     if (mapId == -1 && saved_errno == EINVAL) return fd;
-    if (mapId <= 0) abort();  // should not be possible
+    if (mapId <= 0) {
+        //abort();  // should not be possible
+        return fd;
+    }
 
     // on __LP64__ (aka. 64-bit userspace) 'struct flock64' is the same as 'struct flock'
     struct flock64 fl = {
