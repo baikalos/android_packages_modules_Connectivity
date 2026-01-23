@@ -41,6 +41,7 @@ cc_library {
     ],
     shared_libs: [
         "libbase",
+        "liblog",
     ],
     export_include_dirs: ["include"],
     header_abi_checker: {

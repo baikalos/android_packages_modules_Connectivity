@@ -36,12 +36,15 @@ using base::Result;
 using base::unique_fd;
 using std::function;
 
+#define BPF_MAP_MAKE_VISIBLE_FOR_TESTING
+
 #ifdef BPF_MAP_MAKE_VISIBLE_FOR_TESTING
 #undef BPFMAP_VERBOSE_ABORT
 #define BPFMAP_VERBOSE_ABORT
 #endif
 
-[[noreturn]] __attribute__((__format__(__printf__, 2, 3))) static inline
+//[[noreturn]] __attribute__((__format__(__printf__, 2, 3))) static inline
+static inline
 void Abort(int __unused error, const char* __unused fmt, ...) {
 #ifdef BPFMAP_VERBOSE_ABORT
     va_list va;
@@ -49,14 +52,15 @@ void Abort(int __unused error, const char* __unused fmt, ...) {
 
     fflush(stdout);
     vfprintf(stderr, fmt, va);
-    if (error) fprintf(stderr, "; errno=%d [%s]", error, strerror(error));
+    //if (error) fprintf(stderr, "; errno=%d [%s]", error, strerror(error));
+    if (error) ALOGE("BpfMap; errno=%d [%s]", error, strerror(error));
     putc('\n', stderr);
     fflush(stderr);
 
     va_end(va);
 #endif
 
-    abort();
+    // abort();
 }
 
 
